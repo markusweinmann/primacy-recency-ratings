@@ -39,7 +39,7 @@ df_raw <- read.csv("../Data/Data_primacy_recency_March 17, 2022_16.31.csv")
 glimpse(df_raw)
 ```
 
-Transform dataset from wide to long format
+Prepare data 
 
 ```{r}
 # Select variables
