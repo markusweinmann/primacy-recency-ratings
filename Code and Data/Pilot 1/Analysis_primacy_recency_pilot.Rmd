@@ -1,0 +1,415 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+# Initialize notebook
+
+Load required packages.
+
+```{r load packages, warning=FALSE, message=FALSE}
+library( tidyverse )
+library( visdat )
+library( Hmisc )
+library( funModeling ) 
+library( brms )
+library( tidybayes )
+library( bayesplot )
+library( googlesheets4 )
+library( broom.mixed )
+library( psych )
+```
+
+Set up workspace, i.e., remove all existing data from working memory, initialize the random number generator, turn of scientific notation of large numbers, set a standard theme for plotting.
+
+```{r setup}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
+rm(list=ls())
+set.seed(42)
+options(scipen=10000)
+```
+
+
+# Prep data
+
+Load data from Google Doc.
+
+```{r}
+df_raw <- read.csv("../Data/Data_primacy_recency_March 17, 2022_16.31.csv") 
+glimpse(df_raw)
+```
+
+Prepare data 
+
+```{r}
+# Select variables
+
+df <- df_raw %>% 
+  select( food_first_1:overall_rating_resta_1, story_first_1:movie_overall_rating_1, scenario_timing_Page.Submit, movie_figures ) %>%        # select variables of interest
+  filter( scenario_timing_Page.Submit > 30 ) %>%                                                                       # Attention check 1
+  filter( movie_figures > 30 & movie_figures < 80 ) %>%                                                                # Attention check 2
+  mutate( condition = ifelse( !(is.na(overall_rating_resta_1)), "overall_rating_only",                                 # create condition variable
+                      ifelse( !(is.na(food_first_1)), "primacy",                   
+                      ifelse( !(is.na(food_last_1)), "recency", 
+                      "NA")))) %>%
+  unite( restaurant_overall_rating, c( food_first_6, food_last_6, overall_rating_resta_1 ),                            # create restaurant overall_rating variable
+         na.rm = T ) %>%
+  unite( movie_overall_rating, c( story_first_5, story_last_5, movie_overall_rating_1 ),                               # create movie overall_rating variable
+         na.rm = T ) %>%
+  select( condition, restaurant_overall_rating, movie_overall_rating ) %>%                                             # keep relevant variables       
+  mutate( restaurant_overall_rating = as.integer( restaurant_overall_rating ),                                         # character to integer
+          movie_overall_rating = as.integer( movie_overall_rating )) 
+
+glimpse( df )
+```
+
+
+# Exploratory data analysis
+
+```{r}
+# Restaurant
+
+## Boxplot
+df %>%
+  ggplot() +
+  aes( x = condition, y = restaurant_overall_rating ) +
+  geom_boxplot( ) +
+  theme_gray() +
+  ylab( "Rating")
+
+## Density diagram by condition
+df %>% 
+  filter( condition != "overall_rating_only" ) %>%
+  ggplot(aes( restaurant_overall_rating, fill = condition )) +
+  geom_density( alpha = 0.2)
+
+## Histogram by condition
+df %>% 
+  filter( condition != "overall_rating_only" ) %>%
+  ggplot(aes( restaurant_overall_rating, fill = condition )) +
+  geom_histogram( position = "dodge" )
+
+## Violin plot by condition
+df %>%
+ggplot( mapping = aes(y = restaurant_overall_rating, x = condition )) +
+  geom_violin() +
+  geom_jitter( shape=16, position=position_jitter(0.2), alpha=0.5 ) +
+  geom_boxplot( width=0.1, alpha = 0.7 ) + 
+  labs(x = "Condition", y="Rating" )
+
+
+# Movie
+
+## Boxplot
+df %>%
+  ggplot() +
+  aes( x = condition, y = movie_overall_rating ) +
+  geom_boxplot( ) +
+  theme_gray() +
+  ylab( "Rating")
+
+## Density diagram by condition
+df %>% 
+  filter( condition != "overall_rating_only" ) %>%
+  ggplot(aes( movie_overall_rating, fill = condition )) +
+  geom_density( alpha = 0.2)
+
+## Histogram by condition
+df %>% 
+  filter( condition != "overall_rating_only" ) %>%
+  ggplot(aes( movie_overall_rating, fill = condition )) +
+  geom_histogram( position = "dodge" )
+
+## Violin plot by condition
+df %>%
+ggplot( mapping = aes(y = movie_overall_rating, x = condition )) +
+  geom_violin() +
+  geom_jitter( shape=16, position=position_jitter(0.2), alpha=0.5 ) +
+  geom_boxplot( width=0.1, alpha = 0.7 ) + 
+  labs( x = "Condition", y="Rating" )
+```
+Descriptive statistics
+
+```{r}
+# Restaurant
+tapply(df$restaurant_overall_rating, df$condition, summary)
+
+# Movie
+tapply(df$movie_overall_rating, df$condition, summary)
+```
+
+# Modeling
+
+## Gaussian model
+
+### Restaurant
+
+Prior predictive check
+
+```{r}
+m1 <- 
+  brm( family = gaussian,                                                                       
+       restaurant_overall_rating ~ 0 + condition,                                                           
+       prior = c( prior( normal( 5, 0.5 ), class = b ),                      
+                  prior( exponential( 1 ), class = sigma )),                                    
+       sample_prior = "only",
+       data = df,
+       iter = 2000, warmup = 1000, chains = 4, cores = 4
+     )
+
+# Prior predictive check
+pp_check( m1 ) + theme_bw()
+```
+
+Add data
+
+```{r}
+m1b <- 
+  brm( family = gaussian,                                                                       
+       restaurant_overall_rating ~ 0 + condition,                                                           
+       prior = c( prior( normal( 5, 0.5 ), class = b ),                      
+                  prior( exponential( 1 ), class = sigma )),                                    
+       # sample_prior = "only",
+       data = df,
+       iter = 2000, warmup = 1000, chains = 4, cores = 4
+     )
+
+# Prior predictive check
+pp_check( m1b ) + theme_bw()
+```
+
+Plot effects
+
+```{r}
+mcmc_areas(
+    m1b,
+    regex_pars = "b_",
+    prob = 0.95,
+    point_est = "median",
+    area_method = "equal area"
+    ) +
+    theme_bw()
+```
+
+Estimation details
+
+```{r}
+tidy( m1b )
+```
+
+Hypotheses tests
+
+```{r}
+# RQ1: Do ratings differ between conditions?
+hyp1 <- hypothesis( m1b, "conditionprimacy > conditionrecency", alpha = 0.05 )
+plot( hyp1 )
+hyp1
+```
+
+### Movie
+
+Prior predictive check
+
+```{r}
+m2 <- 
+  brm( family = gaussian,                                                                       
+       movie_overall_rating ~ 0 + condition,                                                           
+       prior = c( prior( normal( 5, 0.5 ), class = b ),                      
+                  prior( exponential( 1 ), class = sigma )),                                    
+       sample_prior = "only",
+       data = df,
+       iter = 2000, warmup = 1000, chains = 4, cores = 4
+     )
+
+# Prior predictive check
+pp_check( m2 ) + theme_bw()
+```
+
+Add data
+
+```{r}
+m2b <- 
+  brm( family = gaussian,                                                                       
+       movie_overall_rating ~ 0 + condition,                                                           
+       prior = c( prior( normal( 5, 0.5 ), class = b ),                      
+                  prior( exponential( 1 ), class = sigma )),                                    
+       # sample_prior = "only",
+       data = df,
+       iter = 2000, warmup = 1000, chains = 4, cores = 4
+     )
+
+# Prior predictive check
+pp_check( m2b ) + theme_bw()
+```
+
+Plot effects
+
+```{r}
+mcmc_areas(
+    m2b,
+    regex_pars = "b_",
+    prob = 0.95,
+    point_est = "median",
+    area_method = "equal area"
+    ) +
+    theme_bw()
+```
+
+Estimation details
+
+```{r}
+tidy( m2b )
+```
+
+Hypotheses tests
+
+```{r}
+# RQ1: Do ratings differ between conditions?
+hyp1 <- hypothesis( m2b, "conditionprimacy > conditionrecency", alpha = 0.05 )
+plot( hyp1 )
+hyp1
+```
+
+## Ordinal model
+
+### Restaurant
+
+Prior predictive check
+
+```{r}
+m3 <- brm( family = cumulative,
+           formula = restaurant_overall_rating ~ condition,
+           prior = c(prior(normal(0, 1.5), class = Intercept),
+           prior(normal(0, 0.5), class = b)),
+           sample_prior = "only",
+           data = df, 
+           iter = 2000, warmup = 1000, cores = 4, chains = 4 )
+
+# Prior predictive check
+pp_check( m3 ) + theme_bw()
+```
+
+Add data
+
+```{r}
+m3b <- brm( family = cumulative,
+            formula = restaurant_overall_rating ~ condition,
+            prior = c(prior(normal(0, 1.5), class = Intercept), 
+                      prior(normal(0, 0.5), class = b)),
+            # sample_prior = "only",
+            data = df, 
+            iter = 2000, warmup = 1000, cores = 4, chains = 4 )
+
+# Prior predictive check
+pp_check( m3b ) + theme_bw()
+```
+
+Compare models
+
+```{r}
+m1b <- add_criterion( m1b, c( "loo", "waic" ))   # Gaussian model
+m3b <- add_criterion( m3b, c( "loo", "waic" ))  # ordinal model
+
+loo_compare( m1b, m3b, criterion = "loo" ) %>% print( simplify = F )
+```
+
+Plot effects
+
+```{r}
+mcmc_areas(
+    m3b,
+    pars = c( "b_conditionprimacy", "b_conditionrecency"),
+    #regex_pars = "b_",
+    prob = 0.95,
+    point_est = "median",
+    area_method = "equal area"
+    ) +
+    theme_bw()
+```
+
+Estimation details
+
+```{r}
+tidy( m3b )
+```
+
+Hypotheses
+
+```{r}
+# RQ1: Is intercept larger than 50% (log-odd = 0)
+q1 <- hypothesis( m3b, "conditionprimacy > conditionrecency" )
+q1
+plot(q1)
+```
+
+### Movie
+
+Prior predictive check
+
+```{r}
+m4 <- brm( family = cumulative,
+           formula = movie_overall_rating ~ condition,
+           prior = c(prior(normal(0, 1.5), class = Intercept),
+           prior(normal(0, 0.5), class = b)),
+           sample_prior = "only",
+           data = df, 
+           iter = 2000, warmup = 1000, cores = 4, chains = 4 )
+
+# Prior predictive check
+pp_check( m4 ) + theme_bw()
+```
+
+Add data
+
+```{r}
+m4b <- brm( family = cumulative,
+            formula = movie_overall_rating ~ condition,
+            prior = c(prior(normal(0, 1.5), class = Intercept), 
+                      prior(normal(0, 0.5), class = b)),
+            # sample_prior = "only",
+            data = df, 
+            iter = 2000, warmup = 1000, cores = 4, chains = 4 )
+
+# Prior predictive check
+pp_check( m4b ) + theme_bw()
+```
+
+Compare models
+
+```{r}
+m2b <- add_criterion( m2b, c( "loo", "waic" ))   # Gaussian model
+m4b <- add_criterion( m4b, c( "loo", "waic" ))  # ordinal model
+
+loo_compare( m2b, m4b, criterion = "loo" ) %>% print( simplify = F )
+```
+
+Plot effects
+
+```{r}
+mcmc_areas(
+    m4b,
+    pars = c( "b_conditionprimacy", "b_conditionrecency"),
+    # regex_pars = "b_",
+    prob = 0.95,
+    point_est = "median",
+    area_method = "equal area"
+    ) +
+    theme_bw()
+```
+
+Estimation details
+
+```{r}
+tidy( m4b )
+```
+
+Hypotheses
+
+```{r}
+# RQ1: Is intercept larger than 50% (log-odd = 0)
+q1 <- hypothesis( m4b, "conditionprimacy > conditionrecency" )
+q1
+plot(q1)
+```
+
+
