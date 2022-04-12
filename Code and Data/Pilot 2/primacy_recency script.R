@@ -9,18 +9,19 @@ library( broom.mixed )
 library( psych )
 library(readxl)
 
-df_raw <- read_excel("Desktop/BadFraming/Study -- OCR (Bad Framing)_April 8, 2022_06.57.xlsx")
+df_raw <- read_excel("Study -- OCR (Bad Framing)_April 8, 2022_06.57.xlsx")
+glimpse( df_raw )
 
 #filtering out only relevant columns (rating dimensions) and attention checks
 df <- df_raw %>% 
   select( food_first_1:food_first_5, food_last_1:food_last_5, overall_rating_restaurant, story_first_1:story_first_4, story_last_1:story_last_4, movie_overall_1, scenario_timing_Page_Submit, movie_figures, boxes_1, boxes_2, boxes_3 ) %>% 
-  filter( scenario_timing_Page_Submit > 30 ) %>%                                                                  
-  filter( movie_figures > 30 & movie_figures < 80 ) %>% 
-  filter( boxes_1 > 10 & boxes_1 < 25) %>% 
+  filter( scenario_timing_Page_Submit > 30 ) %>%
+  filter( movie_figures > 30 & movie_figures < 80 ) %>%
+  filter( boxes_1 > 10 & boxes_1 < 25) %>%
   filter( boxes_2 > 20 & boxes_2 < 35) %>%
   filter( boxes_3 > 55 & boxes_3 < 75)
   
-
+glimpse( df )
 
 #implementation of conditions: primacy, recency and overall rating only
 df1 <- df %>% 
@@ -31,6 +32,7 @@ mutate( condition = ifelse( !(is.na(food_first_1)), "primacy",
   select( condition, overall_rating_restaurant) %>%                                                   
   mutate( overall_rating_restaurant = as.integer( overall_rating_restaurant ))
 
+glimpse( df1 )
 
 #plots
 #boxplot
