@@ -1,0 +1,96 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+# Initialize notebook
+
+Load required packages.
+
+```{r load packages, warning=FALSE, message=FALSE}
+library( tidyverse )
+library( visdat )
+library( Hmisc )
+library( funModeling ) 
+library( brms )
+library( tidybayes )
+library( bayesplot )
+library( googlesheets4 )
+library( broom.mixed )
+library( psych )
+```
+
+Set up workspace, i.e., remove all existing data from working memory, initialize the random number generator, turn of scientific notation of large numbers, set a standard theme for plotting.
+
+```{r setup}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
+rm(list=ls())
+set.seed(42)
+options(scipen=10000)
+```
+
+
+# Prep data
+
+Load data.
+
+```{r}
+df_raw <- read.csv("df.csv") 
+glimpse(df_raw)
+```
+
+Prepare data 
+
+```{r}
+
+#use raw data to calculate means and transform
+
+#make columns numeric
+#only overall rating
+df_raw$Only_overall_rating_1 <- as.numeric(df_raw$Only_overall_rating_1)
+
+#story first -- overall rating
+df_raw$storyfirst_Overall_1 <- as.numeric(df_raw$storyfirst_Overall_1)
+
+#story last -- overall rating
+df_raw$storylast_Overall_1 <- as.numeric(df_raw$storylast_Overall_1)
+
+#make columns numeric
+df_raw$Only_overall_rating_1 <- as.numeric(df_raw$Only_overall_rating_1)
+df_raw$storyfirst_Overall_1 <- as.numeric(df_raw$storyfirst_Overall_1)
+df_raw$storylast_Overall_1 <- as.numeric(df_raw$storylast_Overall_1)
+
+
+#simple t test
+t.test(df_raw$storyfirst_Overall_1, df_raw$storylast_Overall_1)
+
+
+
+
+#now, with filtering (same procecure)
+df <- df_raw %>% 
+  filter( movie_figures > 30 & movie_figures < 80 ) %>%
+  filter(CRT_2_1 == 0.05) %>%
+  filter(CRT_3_1 == 47) %>%
+  filter(CRT_1_1 == 5)
+
+
+
+t.test(df$storyfirst_Overall_1, df$storylast_Overall_1)
+
+
+
+
+#NEW IDEA -- compare storyfirst_1 (story as first dimension) to storylast_4 (story as last dimension, n=746)
+
+t.test(df_raw$storyfirst_1, df_raw$storylast_4)
+
+
+#now with filtering (even more difference but we loose participants and thus statistical power, n=176)
+t.test(df$storyfirst_1, df$storylast_4)
+
+
+
+
+
+
