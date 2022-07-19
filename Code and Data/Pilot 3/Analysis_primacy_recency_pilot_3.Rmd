@@ -73,7 +73,9 @@ df <- df %>%
           story_1 = as.integer( story_1 ),
           story_2 = as.integer( story_2 ),
           story_3 = as.integer( story_3 ),
-          story_4 = as.integer( story_4 )) %>%
+          story_4 = as.integer( story_4 )) 
+
+%>%
   filter( condition != "overall_rating_only") # drop overall-rating-only condition
   
 
