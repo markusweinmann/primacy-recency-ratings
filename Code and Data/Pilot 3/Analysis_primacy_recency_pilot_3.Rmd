@@ -129,12 +129,19 @@ df %>%
 Descriptive statistics
 
 ```{r}
+describeBy(df$movie_overall_rating, df$condition)
+
 tapply(df$movie_overall_rating, df$condition, summary)
 ```
 
-# Modeling
+# t-test
 
-## Simple linear regression
+```{r}
+t.test(df$movie_overall_rating ~ df$condition, var.equal = T, alternative = "two.sided")
+```
+
+
+# Simple linear regression
 
 ```{r}
 fit <- lm( movie_overall_rating ~ condition, data = df)
