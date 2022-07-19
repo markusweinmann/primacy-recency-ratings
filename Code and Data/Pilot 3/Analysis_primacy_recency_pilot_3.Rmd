@@ -137,7 +137,7 @@ tapply(df$movie_overall_rating, df$condition, summary)
 # t-test
 
 ```{r}
-t.test(df$movie_overall_rating ~ df$condition, var.equal = T, alternative = "two.sided")
+t.test( df$movie_overall_rating ~ df$condition, var.equal = T, alternative = "two.sided" )
 ```
 
 
